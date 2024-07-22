@@ -1,5 +1,5 @@
 set windows-shell := ["pwsh", "-NoLogo", "-NoProfileLoadTime", "-Command"]
-project_name := "gfiles"
+project_name := "gexplorer"
 
 profile := env_var_or_default("profile", "debug")
 
