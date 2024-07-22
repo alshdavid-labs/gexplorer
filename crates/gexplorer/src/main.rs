@@ -1,10 +1,16 @@
 mod app_button;
 mod custom_button;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::rc::Rc;
+
 use adw::Application;
 use gtk::gio::MenuModel;
 use gtk::glib;
 use gtk::prelude::*;
+use relm4_macros::view;
 
 const APP_ID: &str = "org.gtk_rs.HelloWorld1";
 
@@ -74,6 +80,30 @@ fn load_css() {
 }
 
 fn build_ui(app: &Application) {
+  view! {
+      vbox = gtk::Box {
+        gtk::WindowControls {
+          set_side: gtk::PackType::End,
+        },
+        gtk::Button {
+          set_label: "Click me!",
+          connect_clicked => |_| {
+            println!("Hello world!");
+          }
+        }
+      }
+  };
+
+  gtk::Window::builder()
+    .application(app)
+    .decorated(false)
+    .child(&vbox)
+    // .title("hello")
+    .build()
+    .present();
+}
+
+fn build_ui2(app: &Application) {
   // let menu_button = gtk::MenuButton::builder()
   //   .icon_name("open-menu-symbolic")
   //   .build();
@@ -185,4 +215,122 @@ fn build_subtitle_bar() -> gtk::Box {
   let l = gtk::Label::new(Some(""));
   subtitle_bar.append(&l);
   subtitle_bar
+}
+
+/*
+#[derive(Default)]
+struct ItemMap<T> {
+  counter: usize,
+  items: HashMap<usize, T>,
+}
+
+impl<T> ItemMap<T> {
+  fn insert(
+    &mut self,
+    item: T,
+  ) -> usize {
+    let index = self.counter.clone();
+    self.items.insert(index.clone(), v);
+    self.counter += 1;
+    index
+  }
+
+  fn remove(
+    &mut self,
+    item: &usize,
+  ) -> Option<T> {
+    self.items.remove(item)
+  }
+
+  fn iter<'a, I: Iterator<Item = &'a T>>(&'a self) -> I {
+    self.items.iter()
+  }
+}
+*/
+
+struct SignalCellDispose<T> {
+  key: slotmap::DefaultKey,
+  subscribers: Rc<RefCell<slotmap::SlotMap<slotmap::DefaultKey, Box<dyn Fn(&T)>>>>,
+}
+
+impl<T> Drop for SignalCellDispose<T> {
+  fn drop(&mut self) {
+    let mut subscribers = self.subscribers.borrow_mut();
+    subscribers.remove(self.key);
+  }
+}
+
+#[derive(Clone)]
+struct SignalCell<T> {
+  value: Rc<RefCell<T>>,
+  subscribers: Rc<RefCell<slotmap::SlotMap<slotmap::DefaultKey, Box<dyn Fn(&T)>>>>,
+}
+
+impl<T> SignalCell<T> {
+  pub fn new(value: T) -> Self {
+    Self {
+      value: Rc::new(RefCell::new(value)),
+      subscribers: Default::default(),
+    }
+  }
+
+  pub fn subscribe<F: Fn(&T) + 'static>(
+    &self,
+    f: F,
+  ) -> SignalCellDispose<T> {
+    {
+      let value = self.value.borrow();
+      f(&*value);
+    }
+    let mut subscribers = self.subscribers.borrow_mut();
+    let key = subscribers.insert(Box::new(f));
+    SignalCellDispose::<T> {
+      key,
+      subscribers: self.subscribers.clone(),
+    }
+  }
+
+  pub fn fetch_update<F: Fn(&mut T)>(
+    &self,
+    f: F,
+  ) {
+    let mut value = self.value.borrow_mut();
+    f(&mut *value);
+
+    let subscribers = self.subscribers.borrow();
+    for (_, subscriber) in subscribers.iter() {
+      subscriber(&*value);
+    }
+  }
+}
+
+fn my_component() -> gtk::Box {
+  let state = SignalCell::new(0);
+
+  let on_click = {
+    let state = state.clone();
+    move |_this: &gtk::Button| {
+      state.fetch_update(|current| {
+        (*current) += 1;
+      })
+    }
+  };
+
+  let g0 = gtk::Box::builder().build();
+
+  let g1 = gtk::Label::builder().build();
+  state.subscribe({
+    let g1 = g1.clone();
+    move |value| {
+      g1.set_label(&format!("State is: {}", value));
+    }
+  });
+
+  let g2 = gtk::Button::builder().build();
+  g2.connect_clicked(on_click);
+
+  g0.append(&g1);
+  g0.append(&g2);
+
+  g0
 }

@@ -6,6 +6,9 @@ edition = "2021"
 [dependencies]
 adw = { version = "0.7.0", package = "libadwaita", features = ["v1_5"] }
 gtk = { version = "0.9.0", package = "gtk4", features = ["v4_14"] }
+relm4-macros = "*"
+relm4 = "*"
+slotmap = "*"
 
 [build-dependencies]
 glib-build-tools = "0.20.0"
